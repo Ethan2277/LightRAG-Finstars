@@ -1770,7 +1770,66 @@ class PGKVStorage(BaseKVStorage):
                     if v.get("queryparam")
                     else None,
                 }
-
+                await self.db.execute(upsert_sql, _data)
+        elif is_namespace(self.namespace, NameSpace.PARSE_CACHE):
+            for k, v in data.items():
+                upsert_sql = SQL_TEMPLATES["upsert_parse_cache"]
+                _data = {
+                    "workspace": self.db.workspace,
+                    "id": k,
+                    "content_list": json.dumps(v.get("content_list", [])),
+                    "doc_id": v["doc_id"],
+                    "mtime": datetime.datetime.fromtimestamp(v["mtime"]).replace(microsecond=0),
+                    "parse_config": json.dumps(v.get("parse_config", {})),
+                    "cached_at": datetime.datetime.fromtimestamp(v['cached_at']).replace(microsecond=0),
+                    "cache_version": v['cache_version'],
+                }
+                await self.db.execute(upsert_sql, _data)
+        elif is_namespace(self.namespace, NameSpace.FILE_RESOURCE):
+            for k, v in data.items():
+                upsert_sql = SQL_TEMPLATES["upsert_file_resource"]
+                _data = {
+                    "workspace": self.db.workspace,
+                    "id": k,
+                    "file_path": v["file_path"],
+                    "file_name": v["file_name"],
+                    "file_type": v["file_type"],
+                    "file_content": v["file_content"],
+                }
+                await self.db.execute(upsert_sql, _data)
+        elif is_namespace(self.namespace, NameSpace.PARSED_CONTENT_LIST):
+            for k, v in data.items():
+                upsert_sql = SQL_TEMPLATES["upsert_parsed_content_list"]
+                _data = {
+                    "workspace": self.db.workspace,
+                    "id": k,
+                    "content": json.dumps(v.get("content", {})),
+                    "file_path": v["file_path"],
+                    "doc_id": v["doc_id"],
+                }
+                await self.db.execute(upsert_sql, _data)
+        elif is_namespace(self.namespace, NameSpace.PARSED_IMAGES):
+            for k, v in data.items():
+                upsert_sql = SQL_TEMPLATES["upsert_parsed_images_resource"]
+                _data = {
+                    "workspace": self.db.workspace,
+                    "id": k,
+                    "image_content": v["image_content"],
+                    "image_path": v["image_path"],
+                    "file_path": v["file_path"],
+                    "doc_id": v["doc_id"],
+                }
+                await self.db.execute(upsert_sql, _data)
+        elif is_namespace(self.namespace, NameSpace.PARSED_MARKDOWN):
+            for k, v in data.items():
+                upsert_sql = SQL_TEMPLATES["upsert_parsed_markdown_resource"]
+                _data = {
+                    "workspace": self.db.workspace,
+                    "id": k,
+                    "markdown_content": v["markdown_content"],
+                    "file_path": v["file_path"],
+                    "doc_id": v["doc_id"],
+                }
                 await self.db.execute(upsert_sql, _data)
         elif is_namespace(self.namespace, NameSpace.KV_STORE_FULL_ENTITIES):
             # Get current UTC time and convert to naive datetime for database storage
@@ -4130,6 +4189,11 @@ NAMESPACE_TABLE_MAP = {
     NameSpace.VECTOR_STORE_ENTITIES: "LIGHTRAG_VDB_ENTITY",
     NameSpace.VECTOR_STORE_RELATIONSHIPS: "LIGHTRAG_VDB_RELATION",
     NameSpace.DOC_STATUS: "LIGHTRAG_DOC_STATUS",
+    NameSpace.PARSE_CACHE: "PARSE_CACHE",
+    NameSpace.FILE_RESOURCE: "FILE_RESOURCE",
+    NameSpace.PARSED_CONTENT_LIST: "PARSED_CONTENT",
+    NameSpace.PARSED_IMAGES: "PARSED_IMAGES",
+    NameSpace.PARSED_MARKDOWN: "PARSED_MARKDOWN",
 }
 
 
@@ -4265,6 +4329,69 @@ TABLES = {
                     CONSTRAINT LIGHTRAG_FULL_RELATIONS_PK PRIMARY KEY (workspace, id)
                     )"""
     },
+    "PARSE_CACHE": {
+        "ddl": """CREATE TABLE PARSE_CACHE (
+                    id VARCHAR(255) NOT NULL,
+                    workspace VARCHAR(255) NOT NULL,
+                    content_list JSONB NOT NULL,
+                    doc_id VARCHAR(255) NOT NULL,
+                    mtime TIMESTAMP(0) NOT NULL,
+                    parse_config JSONB NOT NULL,
+                    cached_at TIMESTAMP(0) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    cache_version VARCHAR(64) NOT NULL DEFAULT 'v1',
+                    CONSTRAINT PARSE_CACHE_PK PRIMARY KEY (workspace, id)
+                  )"""
+    },
+    "FILE_RESOURCE": {
+        "ddl": """CREATE TABLE FILE_RESOURCE (
+                    id VARCHAR(255) NOT NULL,
+                    workspace VARCHAR(255) NOT NULL,
+                    file_path TEXT NOT NULL,
+                    file_name TEXT NOT NULL,
+                    file_type TEXT NOT NULL,
+                    file_content TEXT NOT NULL,
+                    create_time TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+                    update_time TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT FILE_RESOURCE_PK PRIMARY KEY (workspace, id)
+                  )"""
+    },
+    "PARSED_CONTENT": {
+        "ddl": """CREATE TABLE PARSED_CONTENT (
+                    id VARCHAR(255) NOT NULL,
+                    workspace VARCHAR(255) NOT NULL,
+                    content JSONB NOT NULL,
+                    file_path TEXT NULL,
+                    doc_id VARCHAR(255) NOT NULL,
+                    create_time TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+                    update_time TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT PARSED_CONTENT_PK PRIMARY KEY (workspace, id)
+                  )"""
+    },
+    "PARSED_IMAGES": {
+        "ddl": """CREATE TABLE PARSED_IMAGES (
+                    id VARCHAR(255) NOT NULL,
+                    workspace VARCHAR(255) NOT NULL,
+                    image_path TEXT NOT NULL,
+                    image_content TEXT NOT NULL,
+                    file_path TEXT NULL,
+                    doc_id VARCHAR(255) NOT NULL,
+                    create_time TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+                    update_time TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT PARSER_IMAGES_PK PRIMARY KEY (workspace, id)
+                  )"""
+    },
+    "PARSED_MARKDOWN": {
+        "ddl": """CREATE TABLE PARSED_MARKDOWN (
+                    id VARCHAR(255) NOT NULL,
+                    workspace VARCHAR(255) NOT NULL,
+                    markdown_content TEXT NOT NULL,
+                    file_path TEXT NULL,
+                    doc_id VARCHAR(255) NOT NULL,
+                    create_time TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+                    update_time TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT PARSED_MARKDOWN_PK PRIMARY KEY (workspace, id)
+                  )"""
+    },
 }
 
 
@@ -4285,6 +4412,20 @@ SQL_TEMPLATES = {
                                 EXTRACT(EPOCH FROM update_time)::BIGINT as update_time
                                 FROM LIGHTRAG_LLM_CACHE WHERE workspace=$1 AND id=$2
                                """,
+    "get_by_id_parse_cache": """SELECT id, content_list, doc_id, mtime, parse_config, 
+                                EXTRACT(EPOCH FROM cached_at)::BIGINT as cached_at,
+                                cache_version
+                                FROM PARSE_CACHE WHERE workspace=$1 AND id=$2
+                               """,
+    "get_by_id_file_resource": """SELECT id, file_path, file_name, file_type, file_content
+                                FROM FILE_RESOURCE WHERE workspace=$1 AND id=$2
+                                """,
+    "get_by_id_parsed_content_list": """SELECT id, content, file_path, doc_id
+                                FROM PARSED_CONTENT WHERE workspace=$1 AND id=$2
+                                """,
+    "get_by_id_parsed_images_resource": """SELECT id, image_path, image_content, file_path, doc_id
+                                FROM PARSED_IMAGES WHERE workspace=$1 AND id=$2
+                                """,
     "get_by_ids_full_docs": """SELECT id, COALESCE(content, '') as content
                                  FROM LIGHTRAG_DOC_FULL WHERE workspace=$1 AND id IN ({ids})
                             """,
@@ -4349,6 +4490,49 @@ SQL_TEMPLATES = {
                       llm_cache_list=EXCLUDED.llm_cache_list,
                       update_time = EXCLUDED.update_time
                      """,
+    "upsert_parse_cache": """INSERT INTO PARSE_CACHE (workspace, id, content_list, doc_id, mtime,
+                                parse_config, cached_at, cache_version)
+                                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                                ON CONFLICT (workspace, id) DO UPDATE
+                                SET content_list = EXCLUDED.content_list,
+                                    doc_id = EXCLUDED.doc_id,
+                                    mtime = EXCLUDED.mtime,
+                                    parse_config = EXCLUDED.parse_config,
+                                    cached_at = EXCLUDED.cached_at,
+                                    cache_version = EXCLUDED.cache_version
+                                """,
+    "upsert_file_resource": """INSERT INTO FILE_RESOURCE (workspace, id, file_path, file_name, file_type, file_content)
+                                VALUES ($1, $2, $3, $4, $5, $6)
+                                ON CONFLICT (workspace, id) DO UPDATE
+                                SET file_path = EXCLUDED.file_path,
+                                    file_name = EXCLUDED.file_name,
+                                    file_type = EXCLUDED.file_type,
+                                    file_content = EXCLUDED.file_content,
+                                    update_time = CURRENT_TIMESTAMP
+                                """,
+    "upsert_parsed_content_list": """INSERT INTO PARSED_CONTENT (workspace, id, content, file_path, doc_id)
+                                VALUES ($1, $2, $3, $4, $5)
+                                ON CONFLICT (workspace, id) DO UPDATE
+                                SET content = EXCLUDED.content,
+                                    file_path = EXCLUDED.file_path,
+                                    doc_id = EXCLUDED.doc_id
+                                """,
+    "upsert_parsed_images_resource": """INSERT INTO PARSED_IMAGES (workspace, id, image_path, image_content, file_path, doc_id)
+                                VALUES ($1, $2, $3, $4, $5, $6)
+                                ON CONFLICT (workspace, id) DO UPDATE
+                                SET image_path = EXCLUDED.image_path,
+                                    image_content = EXCLUDED.image_content,
+                                    file_path = EXCLUDED.file_path,
+                                    doc_id = EXCLUDED.doc_id,
+                                    update_time = CURRENT_TIMESTAMP
+                                """,
+    "upsert_parsed_markdown_resource": """INSERT INTO PARSED_MARKDOWN (workspace, id, markdown_content, file_path, doc_id)
+                                VALUES ($1, $2, $3, $4, $5)
+                                ON CONFLICT (workspace, id) DO UPDATE
+                                SET markdown_content = EXCLUDED.markdown_content,
+                                    file_path = EXCLUDED.file_path,
+                                    doc_id = EXCLUDED.doc_id
+                                """,
     "upsert_full_entities": """INSERT INTO LIGHTRAG_FULL_ENTITIES (workspace, id, entity_names, count,
                       create_time, update_time)
                       VALUES ($1, $2, $3, $4, $5, $6)

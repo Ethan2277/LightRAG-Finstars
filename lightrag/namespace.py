@@ -17,6 +17,13 @@ class NameSpace:
     GRAPH_STORE_CHUNK_ENTITY_RELATION = "chunk_entity_relation"
 
     DOC_STATUS = "doc_status"
+    
+    PARSE_CACHE = "parse_cache"
+    
+    FILE_RESOURCE = "file_resource"
+    PARSED_CONTENT_LIST = "parsed_content_list"
+    PARSED_IMAGES = "parsed_images"
+    PARSED_MARKDOWN = "parsed_markdown"
 
 
 def is_namespace(namespace: str, base_namespace: str | Iterable[str]):
